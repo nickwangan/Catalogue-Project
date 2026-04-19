@@ -11,6 +11,8 @@ export function LoginPage() {
 
   const { login, signup } = useAuth()
 
+  const { refreshSession } = useAuth()
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
@@ -25,6 +27,8 @@ export function LoginPage() {
         alert('Account created! Please log in.')
       } else {
         await login(email, password)
+        // Refresh session after login
+        await refreshSession()
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred')

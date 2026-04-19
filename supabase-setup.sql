@@ -69,28 +69,26 @@ USING (
 
 -- 6. RLS Policies for user_roles table
 
--- Users can only view their own role
+-- Users can view their own role
 CREATE POLICY "Users can view their own role"
 ON user_roles
 FOR SELECT
 USING (user_roles.user_id = auth.uid());
 
--- Only admins can manage roles (optional - adjust as needed)
-CREATE POLICY "Managers can view all roles"
+-- Managers can view all roles for administration purposes
+CREATE POLICY "Managers can view all roles for admin"
 ON user_roles
 FOR SELECT
 USING (
-  EXISTS (
-    SELECT 1 FROM user_roles
-    WHERE user_roles.user_id = auth.uid()
-    AND user_roles.role = 'manager'
+  auth.uid() IN (
+    SELECT user_id FROM user_roles WHERE role = 'manager'
   )
 );
 
 -- 7. Function to get user role
-CREATE OR REPLACE FUNCTION get_user_role(user_id UUID)
+CREATE OR REPLACE FUNCTION get_user_role(p_user_id UUID)
 RETURNS VARCHAR AS $$
-  SELECT role FROM user_roles WHERE user_id = user_id LIMIT 1;
+  SELECT role FROM user_roles WHERE user_id = p_user_id LIMIT 1;
 $$ LANGUAGE SQL;
 
 -- 8. Function to set updated_at on UPDATE

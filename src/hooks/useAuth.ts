@@ -10,6 +10,10 @@ export function useAuth() {
       password,
     })
     if (error) throw error
+
+    // Wait a moment for session to be established
+    await new Promise(resolve => setTimeout(resolve, 500))
+
     return data
   }
 

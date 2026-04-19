@@ -8,6 +8,7 @@ type AuthContextType = {
   loading: boolean
   isManager: boolean
   logout: () => Promise<void>
+  refreshSession: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -16,22 +17,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [role, setRole] = useState<UserRole | null>(null)
   const [loading, setLoading] = useState(true)
+  const [refreshTrigger, setRefreshTrigger] = useState(0)
 
-  useEffect(() => {
-    // Check current session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null)
-      if (session?.user) {
-        fetchUserRole(session.user.id)
-      } else {
-        setLoading(false)
-      }
-    })
-
-    // Listen for auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+  const refreshSession = async () => {
+    setLoading(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
       setUser(session?.user ?? null)
       if (session?.user) {
         await fetchUserRole(session.user.id)
@@ -39,10 +30,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setRole(null)
         setLoading(false)
       }
-    })
+    } catch (err) {
+      console.error('Error refreshing session:', err)
+      setLoading(false)
+    }
+  }
 
-    return () => subscription?.unsubscribe()
-  }, [])
+  useEffect(() => {
+    refreshSession()
+  }, [refreshTrigger])
 
   const fetchUserRole = async (userId: string) => {
     try {
@@ -67,13 +63,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const logout = async () => {
-    await supabase.auth.signOut()
+    try {
+      await supabase.auth.signOut()
+    } catch (err) {
+      console.error('Logout error:', err)
+    }
     setUser(null)
     setRole(null)
+    setLoading(false)
   }
 
   return (
-    <AuthContext.Provider value={{ user, role, loading, isManager: role === 'manager', logout }}>
+    <AuthContext.Provider value={{ user, role, loading, isManager: role === 'manager', logout, refreshSession }}>
       {children}
     </AuthContext.Provider>
   )
