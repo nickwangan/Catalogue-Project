@@ -126,3 +126,32 @@ export function useDeleteLogo() {
     },
   })
 }
+
+// ============================================================
+// Hook: useReorderLogos
+// Persists a new display_order for a brand's logos via the
+// reorder_brand_logos RPC (atomic, permission-checked server-side).
+// ============================================================
+export function useReorderLogos() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({
+      brandId,
+      logoIds,
+    }: {
+      brandId: string
+      logoIds: string[]
+    }) => {
+      const { error } = await supabase.rpc('reorder_brand_logos', {
+        p_brand_id: brandId,
+        p_logo_ids: logoIds,
+      })
+      if (error) throw error
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['brand', variables.brandId] })
+      queryClient.invalidateQueries({ queryKey: ['brands'] })
+    },
+  })
+}

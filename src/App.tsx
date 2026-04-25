@@ -5,6 +5,7 @@ import { LoginPage } from './components/Auth/LoginPage'
 import { BrandsPage } from './components/Brands/BrandsPage'
 import { BrandPage } from './components/Brands/BrandPage'
 import { BrandFormPage } from './components/Brands/BrandFormPage'
+import { SettingsPage } from './components/Settings/SettingsPage'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -39,6 +40,7 @@ function ProtectedRoutes() {
       <Route path="/brand/new" element={<BrandFormPage mode="create" />} />
       <Route path="/brand/:slug" element={<BrandPage />} />
       <Route path="/brand/:slug/edit" element={<BrandFormPage mode="edit" />} />
+      <Route path="/settings" element={<SettingsPage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )

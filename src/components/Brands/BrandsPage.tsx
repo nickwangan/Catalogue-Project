@@ -103,6 +103,15 @@ export function BrandsPage() {
                 {role === 'employee' && '👥 Employee'}
               </p>
             </div>
+            {canEditBrands && (
+              <Link
+                to="/settings"
+                className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg transition-colors"
+                title="Settings"
+              >
+                ⚙ Settings
+              </Link>
+            )}
             <button
               onClick={logout}
               className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors"
