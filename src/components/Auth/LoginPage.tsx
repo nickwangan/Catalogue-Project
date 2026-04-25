@@ -56,15 +56,16 @@ export function LoginPage() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Email
+              {isSignUp ? 'Email' : 'Email or Username'}
             </label>
             <input
-              type="email"
+              type={isSignUp ? 'email' : 'text'}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+              autoComplete={isSignUp ? 'email' : 'username'}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
-              placeholder="you@example.com"
+              placeholder={isSignUp ? 'you@example.com' : 'you@example.com or username'}
             />
           </div>
 

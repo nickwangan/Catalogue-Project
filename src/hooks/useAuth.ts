@@ -4,7 +4,23 @@ import { supabase, getRoleFromPin } from '../lib/supabase'
 export function useAuth() {
   const auth = useAuthContext()
 
-  const login = async (email: string, password: string) => {
+  const login = async (identifier: string, password: string) => {
+    let email = identifier.trim()
+
+    // If the identifier doesn't look like an email, treat it as a username
+    // and resolve it to an email via the RPC.
+    if (!email.includes('@')) {
+      const { data: resolvedEmail, error: rpcError } = await supabase.rpc(
+        'get_email_by_username',
+        { p_username: email.toLowerCase() },
+      )
+      if (rpcError) throw rpcError
+      if (!resolvedEmail) {
+        throw new Error('No account found for that username.')
+      }
+      email = resolvedEmail
+    }
+
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
