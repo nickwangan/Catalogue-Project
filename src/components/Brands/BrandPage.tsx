@@ -3,8 +3,10 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useBrand } from '../../hooks/useBrand'
 import { useDeleteBrand } from '../../hooks/useBrands'
 import { useAuth } from '../../hooks/useAuth'
+import { useToast } from '../../context/ToastContext'
 import { LogoGallery } from './LogoGallery'
 import { ChangeHistory } from './ChangeHistory'
+import { PriceContext } from '../../lib/supabase'
 
 export function BrandPage() {
   const { slug } = useParams<{ slug: string }>()
@@ -12,9 +14,11 @@ export function BrandPage() {
   const { canEditBrands, username } = useAuth()
   const { data: brand, isLoading, error } = useBrand(slug)
   const deleteBrand = useDeleteBrand()
+  const { showToast } = useToast()
 
   const [categoryFilter, setCategoryFilter] = useState<string[]>([])
   const [filterOpen, setFilterOpen] = useState(false)
+  const [activeContextIds, setActiveContextIds] = useState<string[]>([])
 
   const allCategories = useMemo(
     () => brand?.categories.map(c => c.category) ?? [],
@@ -27,14 +31,28 @@ export function BrandPage() {
     return brand.categories.filter(c => categoryFilter.includes(c.category))
   }, [brand, categoryFilter])
 
+  const activeContexts: PriceContext[] = useMemo(() => {
+    if (!brand) return []
+    return brand.price_contexts.filter(c => activeContextIds.includes(c.id))
+  }, [brand, activeContextIds])
+
+  const totalModifier = useMemo(
+    () => activeContexts.reduce((sum, c) => sum + Number(c.modifier_amount), 0),
+    [activeContexts],
+  )
+
   const handleDelete = async () => {
     if (!brand) return
     if (!window.confirm(`Delete brand "${brand.name}"? This cannot be undone.`)) return
     try {
       await deleteBrand.mutateAsync(brand.id)
+      showToast('Brand deleted')
       navigate('/')
     } catch (err) {
-      alert('Error deleting: ' + (err instanceof Error ? err.message : 'Unknown'))
+      showToast(
+        'Error deleting: ' + (err instanceof Error ? err.message : 'Unknown'),
+        'error',
+      )
     }
   }
 
@@ -54,6 +72,8 @@ export function BrandPage() {
       </div>
     )
   }
+
+  const hasActive = activeContexts.length > 0
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -116,8 +136,45 @@ export function BrandPage() {
 
         {/* Pricing Table */}
         <div className="bg-white rounded-lg shadow-md p-6">
-          <div className="flex justify-between items-start mb-4">
-            <h2 className="text-2xl font-bold text-gray-900">Pricing by Category</h2>
+          <div className="flex flex-wrap justify-between items-start gap-4 mb-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <h2 className="text-2xl font-bold text-gray-900">Pricing by Category</h2>
+              {brand.price_contexts.length > 0 && (
+                <div className="flex flex-wrap items-center gap-2 ml-2">
+                  {brand.price_contexts.map(ctx => {
+                    const checked = activeContextIds.includes(ctx.id)
+                    return (
+                      <label
+                        key={ctx.id}
+                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-sm cursor-pointer transition-colors ${
+                          checked
+                            ? 'border-amber-400 bg-amber-50 text-amber-900'
+                            : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() =>
+                            setActiveContextIds(prev =>
+                              prev.includes(ctx.id)
+                                ? prev.filter(id => id !== ctx.id)
+                                : [...prev, ctx.id],
+                            )
+                          }
+                          className="accent-amber-500"
+                        />
+                        <span className="font-medium">{ctx.name}</span>
+                        <span className="text-xs text-gray-500">
+                          ({Number(ctx.modifier_amount) >= 0 ? '+' : ''}
+                          ${Number(ctx.modifier_amount).toFixed(2)})
+                        </span>
+                      </label>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
             {allCategories.length > 0 && (
               <div className="relative">
                 <button
@@ -172,20 +229,35 @@ export function BrandPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredCategories.map((c, idx) => (
-                    <tr
-                      key={c.id}
-                      className={`${idx !== filteredCategories.length - 1 ? 'border-b-2 border-gray-300' : ''}`}
-                    >
-                      <td className="px-6 py-4 font-medium text-gray-800">{c.category}</td>
-                      <td className="px-6 py-4 text-right text-gray-700">
-                        ${Number(c.min_price).toFixed(2)}
-                      </td>
-                      <td className="px-6 py-4 text-right text-gray-700">
-                        ${Number(c.max_price).toFixed(2)}
-                      </td>
-                    </tr>
-                  ))}
+                  {filteredCategories.map((c, idx) => {
+                    const baseMin = Number(c.min_price)
+                    const baseMax = Number(c.max_price)
+                    const totalMin = baseMin + totalModifier
+                    const totalMax = baseMax + totalModifier
+                    const rowBorder =
+                      idx !== filteredCategories.length - 1 ? 'border-b-2 border-gray-300' : ''
+                    return (
+                      <tr key={c.id} className={rowBorder}>
+                        <td className="px-6 py-4 font-medium text-gray-800">{c.category}</td>
+                        <td className="px-6 py-4 text-right text-gray-700">
+                          <PriceCell
+                            base={baseMin}
+                            total={totalMin}
+                            activeContexts={activeContexts}
+                            showBreakdown={hasActive}
+                          />
+                        </td>
+                        <td className="px-6 py-4 text-right text-gray-700">
+                          <PriceCell
+                            base={baseMax}
+                            total={totalMax}
+                            activeContexts={activeContexts}
+                            showBreakdown={hasActive}
+                          />
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
@@ -197,6 +269,38 @@ export function BrandPage() {
           <ChangeHistory entries={brand.history} />
         </div>
       </main>
+    </div>
+  )
+}
+
+function PriceCell({
+  base,
+  total,
+  activeContexts,
+  showBreakdown,
+}: {
+  base: number
+  total: number
+  activeContexts: PriceContext[]
+  showBreakdown: boolean
+}) {
+  if (!showBreakdown) {
+    return <span>${base.toFixed(2)}</span>
+  }
+  return (
+    <div className="flex flex-col items-end leading-tight">
+      <span className="text-gray-700">${base.toFixed(2)}</span>
+      {activeContexts.map(ctx => {
+        const amt = Number(ctx.modifier_amount)
+        const sign = amt >= 0 ? '+' : '−'
+        return (
+          <span key={ctx.id} className="text-xs text-amber-700">
+            {sign}${Math.abs(amt).toFixed(2)}{' '}
+            <span className="text-amber-500">({ctx.name})</span>
+          </span>
+        )
+      })}
+      <span className="font-bold text-amber-900 mt-0.5">${total.toFixed(2)}</span>
     </div>
   )
 }

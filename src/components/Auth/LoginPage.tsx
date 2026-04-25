@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useAuth } from '../../hooks/useAuth'
+import { useToast } from '../../context/ToastContext'
 
 export function LoginPage() {
   const [isSignUp, setIsSignUp] = useState(false)
@@ -11,6 +12,7 @@ export function LoginPage() {
   const [loading, setLoading] = useState(false)
 
   const { login, signup, refreshSession } = useAuth()
+  const { showToast } = useToast()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -20,12 +22,16 @@ export function LoginPage() {
     try {
       if (isSignUp) {
         await signup(email, password, username, pin)
-        setEmail('')
-        setPassword('')
-        setUsername('')
-        setPin('')
-        setIsSignUp(false)
-        alert('Account created! Please log in.')
+        // Auto-login: signUp returned an active session (email confirmation
+        // is disabled), so refreshing the auth context drops us straight
+        // into the app. Fall back to an explicit login if no session yet.
+        try {
+          await refreshSession()
+        } catch {
+          await login(email, password)
+          await refreshSession()
+        }
+        showToast('Account created — welcome!')
       } else {
         await login(email, password)
         await refreshSession()

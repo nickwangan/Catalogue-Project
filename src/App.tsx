@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AuthProvider, useAuth } from './context/AuthContext'
+import { ToastProvider } from './context/ToastContext'
 import { LoginPage } from './components/Auth/LoginPage'
 import { BrandsPage } from './components/Brands/BrandsPage'
 import { BrandPage } from './components/Brands/BrandPage'
@@ -50,9 +51,11 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <AuthProvider>
-          <ProtectedRoutes />
-        </AuthProvider>
+        <ToastProvider>
+          <AuthProvider>
+            <ProtectedRoutes />
+          </AuthProvider>
+        </ToastProvider>
       </BrowserRouter>
     </QueryClientProvider>
   )

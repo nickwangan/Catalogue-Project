@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useCategories } from '../../hooks/useReference'
 import { useCreateCategory, useDeleteCategory } from '../../hooks/useSettings'
+import { useToast } from '../../context/ToastContext'
 import { Gender } from '../../lib/supabase'
 
 export function CategoriesTab() {
@@ -93,6 +94,7 @@ export function CategoriesTab() {
 
 function DeleteCategoryButton({ id, name }: { id: number; name: string }) {
   const del = useDeleteCategory()
+  const { showToast } = useToast()
   const handleClick = async () => {
     if (
       !confirm(
@@ -102,8 +104,9 @@ function DeleteCategoryButton({ id, name }: { id: number; name: string }) {
       return
     try {
       await del.mutateAsync(id)
+      showToast('Category deleted')
     } catch (err) {
-      alert('Delete failed: ' + (err instanceof Error ? err.message : String(err)))
+      showToast('Delete failed: ' + (err instanceof Error ? err.message : String(err)), 'error')
     }
   }
   return (
@@ -123,6 +126,7 @@ function CategoryFormModal({ onClose }: { onClose: () => void }) {
   const [women, setWomen] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const create = useCreateCategory()
+  const { showToast } = useToast()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -134,6 +138,7 @@ function CategoryFormModal({ onClose }: { onClose: () => void }) {
     if (women) allowed.push('Women')
     try {
       await create.mutateAsync({ name: name.trim(), allowed_genders: allowed })
+      showToast('Category created')
       onClose()
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))

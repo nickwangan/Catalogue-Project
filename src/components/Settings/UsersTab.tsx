@@ -1,16 +1,13 @@
 import { useAuth } from '../../hooks/useAuth'
-import {
-  useAllUsers,
-  useDeleteUserProfile,
-  useUpdateUserRole,
-} from '../../hooks/useSettings'
+import { useAllUsers, useUpdateUserRole } from '../../hooks/useSettings'
+import { useToast } from '../../context/ToastContext'
 import { UserProfile, UserRole } from '../../lib/supabase'
 
 export function UsersTab() {
   const { user: currentUser } = useAuth()
   const { data: users, isLoading } = useAllUsers()
   const updateRole = useUpdateUserRole()
-  const deleteProfile = useDeleteUserProfile()
+  const { showToast } = useToast()
 
   const handleRoleChange = async (u: UserProfile, role: UserRole) => {
     if (u.role === role) return
@@ -22,22 +19,12 @@ export function UsersTab() {
       return
     try {
       await updateRole.mutateAsync({ userId: u.user_id, role })
+      showToast('Role updated')
     } catch (err) {
-      alert('Update failed: ' + (err instanceof Error ? err.message : String(err)))
-    }
-  }
-
-  const handleDelete = async (u: UserProfile) => {
-    if (
-      !confirm(
-        `Remove @${u.username}'s profile?\n\nThis only deletes their role/username — the auth login still exists in Supabase. To fully remove the account, also delete the user from Supabase → Authentication → Users.`,
+      showToast(
+        'Update failed: ' + (err instanceof Error ? err.message : String(err)),
+        'error',
       )
-    )
-      return
-    try {
-      await deleteProfile.mutateAsync(u.user_id)
-    } catch (err) {
-      alert('Delete failed: ' + (err instanceof Error ? err.message : String(err)))
     }
   }
 
@@ -45,8 +32,12 @@ export function UsersTab() {
     <div>
       <h2 className="text-xl font-bold text-gray-800 mb-4">Users</h2>
       <p className="text-sm text-gray-600 mb-4">
-        Promote, demote, or remove users. The role you set here takes effect the
-        next time the user reloads the app.
+        Promote or demote users. The role you set here takes effect the next
+        time the user reloads the app.
+      </p>
+      <p className="text-xs text-gray-500 mb-4">
+        💡 To fully delete an account, use the Supabase dashboard
+        (Authentication → Users).
       </p>
 
       {isLoading ? (
@@ -58,7 +49,6 @@ export function UsersTab() {
               <th className="text-left px-4 py-2 text-sm font-semibold text-gray-700">Username</th>
               <th className="text-left px-4 py-2 text-sm font-semibold text-gray-700">Role</th>
               <th className="text-left px-4 py-2 text-sm font-semibold text-gray-700">Joined</th>
-              <th className="px-4 py-2"></th>
             </tr>
           </thead>
           <tbody>
@@ -89,23 +79,12 @@ export function UsersTab() {
                   <td className="px-4 py-2 text-sm text-gray-600">
                     {new Date(u.created_at).toLocaleDateString()}
                   </td>
-                  <td className="px-4 py-2 text-right">
-                    {!isSelf && (
-                      <button
-                        onClick={() => handleDelete(u)}
-                        disabled={deleteProfile.isPending}
-                        className="text-red-600 hover:underline text-sm disabled:opacity-50"
-                      >
-                        Remove
-                      </button>
-                    )}
-                  </td>
                 </tr>
               )
             })}
             {(users ?? []).length === 0 && (
               <tr>
-                <td colSpan={4} className="px-4 py-6 text-center text-gray-500 italic">
+                <td colSpan={3} className="px-4 py-6 text-center text-gray-500 italic">
                   No users yet.
                 </td>
               </tr>
@@ -113,11 +92,6 @@ export function UsersTab() {
           </tbody>
         </table>
       )}
-
-      <p className="text-xs text-gray-500 mt-4">
-        💡 You can't change or remove your own role here, to prevent accidentally
-        locking yourself out.
-      </p>
     </div>
   )
 }

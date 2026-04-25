@@ -2,10 +2,11 @@ import { useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import { PresetsTab } from './PresetsTab'
+import { PriceContextsTab } from './PriceContextsTab'
 import { CategoriesTab } from './CategoriesTab'
 import { UsersTab } from './UsersTab'
 
-type Tab = 'presets' | 'categories' | 'users'
+type Tab = 'presets' | 'contexts' | 'categories' | 'users'
 
 export function SettingsPage() {
   const { canEditBrands, isAdmin, username, role, logout } = useAuth()
@@ -55,6 +56,9 @@ export function SettingsPage() {
           <TabButton active={tab === 'presets'} onClick={() => setTab('presets')}>
             💲 Pricing Presets
           </TabButton>
+          <TabButton active={tab === 'contexts'} onClick={() => setTab('contexts')}>
+            ✨ Price Contexts
+          </TabButton>
           <TabButton active={tab === 'categories'} onClick={() => setTab('categories')}>
             🏷️ Custom Categories
           </TabButton>
@@ -67,6 +71,7 @@ export function SettingsPage() {
 
         <div className="bg-white rounded-lg shadow-md p-6">
           {tab === 'presets' && <PresetsTab />}
+          {tab === 'contexts' && <PriceContextsTab />}
           {tab === 'categories' && <CategoriesTab />}
           {tab === 'users' && isAdmin && <UsersTab />}
         </div>

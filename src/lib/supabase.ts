@@ -84,6 +84,13 @@ export type PricingPreset = {
   created_at: string
 }
 
+export type PriceContext = {
+  id: string
+  name: string
+  modifier_amount: number
+  created_at: string
+}
+
 export type ChangeHistoryEntry = {
   id: string
   brand_id: string
@@ -98,6 +105,7 @@ export type ChangeHistoryEntry = {
 export type BrandWithDetails = Brand & {
   logos: BrandLogo[]
   categories: BrandCategory[]
+  price_contexts: PriceContext[]
 }
 
 // ============================================================

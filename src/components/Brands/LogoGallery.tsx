@@ -1,10 +1,7 @@
 import { useState, useRef } from 'react'
 import { BrandLogo } from '../../lib/supabase'
-import {
-  useUploadLogos,
-  useDeleteLogo,
-  useReorderLogos,
-} from '../../hooks/useLogos'
+import { useUploadLogos, useDeleteLogo } from '../../hooks/useLogos'
+import { useToast } from '../../context/ToastContext'
 
 type Props = {
   brandId: string
@@ -18,33 +15,19 @@ export function LogoGallery({ brandId, logos, canEdit, username }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const uploadLogos = useUploadLogos()
   const deleteLogo = useDeleteLogo()
-  const reorderLogos = useReorderLogos()
-
-  const handleReorder = async (idx: number, direction: -1 | 1) => {
-    const newIdx = idx + direction
-    if (newIdx < 0 || newIdx >= logos.length) return
-    const reordered = [...logos]
-    const [moved] = reordered.splice(idx, 1)
-    reordered.splice(newIdx, 0, moved)
-    try {
-      await reorderLogos.mutateAsync({
-        brandId,
-        logoIds: reordered.map(l => l.id),
-      })
-      // Keep the user looking at the same image they just moved
-      setActiveIdx(newIdx)
-    } catch (err) {
-      alert('Reorder failed: ' + (err instanceof Error ? err.message : 'Unknown'))
-    }
-  }
+  const { showToast } = useToast()
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files ? Array.from(e.target.files) : []
     if (files.length === 0) return
     try {
       await uploadLogos.mutateAsync({ brandId, files, username })
+      showToast(`${files.length} image${files.length === 1 ? '' : 's'} added`)
     } catch (err) {
-      alert('Upload failed: ' + (err instanceof Error ? err.message : 'Unknown'))
+      showToast(
+        'Upload failed: ' + (err instanceof Error ? err.message : 'Unknown'),
+        'error',
+      )
     } finally {
       if (fileInputRef.current) fileInputRef.current.value = ''
     }
@@ -57,8 +40,12 @@ export function LogoGallery({ brandId, logos, canEdit, username }: Props) {
     try {
       await deleteLogo.mutateAsync({ logo, username })
       setActiveIdx(0)
+      showToast('Image removed')
     } catch (err) {
-      alert('Delete failed: ' + (err instanceof Error ? err.message : 'Unknown'))
+      showToast(
+        'Delete failed: ' + (err instanceof Error ? err.message : 'Unknown'),
+        'error',
+      )
     }
   }
 
@@ -110,38 +97,17 @@ export function LogoGallery({ brandId, logos, canEdit, username }: Props) {
             />
           </div>
           {logos.length > 1 && (
-            <div className="flex gap-3 mt-3 overflow-x-auto pb-2">
+            <div className="flex gap-2 mt-3 overflow-x-auto pb-2">
               {logos.map((logo, idx) => (
-                <div key={logo.id} className="flex-shrink-0 flex flex-col items-center">
-                  <button
-                    onClick={() => setActiveIdx(idx)}
-                    className={`w-16 h-16 rounded border-2 overflow-hidden ${
-                      idx === activeIdx ? 'border-indigo-600' : 'border-gray-200'
-                    }`}
-                  >
-                    <img src={logo.image_url} alt="" className="w-full h-full object-cover" />
-                  </button>
-                  {canEdit && (
-                    <div className="flex gap-1 mt-1">
-                      <button
-                        onClick={() => handleReorder(idx, -1)}
-                        disabled={idx === 0 || reorderLogos.isPending}
-                        title="Move left"
-                        className="text-xs px-1.5 py-0.5 bg-gray-100 hover:bg-gray-200 rounded disabled:opacity-30 disabled:cursor-not-allowed"
-                      >
-                        ←
-                      </button>
-                      <button
-                        onClick={() => handleReorder(idx, 1)}
-                        disabled={idx === logos.length - 1 || reorderLogos.isPending}
-                        title="Move right"
-                        className="text-xs px-1.5 py-0.5 bg-gray-100 hover:bg-gray-200 rounded disabled:opacity-30 disabled:cursor-not-allowed"
-                      >
-                        →
-                      </button>
-                    </div>
-                  )}
-                </div>
+                <button
+                  key={logo.id}
+                  onClick={() => setActiveIdx(idx)}
+                  className={`flex-shrink-0 w-16 h-16 rounded border-2 overflow-hidden ${
+                    idx === activeIdx ? 'border-indigo-600' : 'border-gray-200'
+                  }`}
+                >
+                  <img src={logo.image_url} alt="" className="w-full h-full object-cover" />
+                </button>
               ))}
             </div>
           )}

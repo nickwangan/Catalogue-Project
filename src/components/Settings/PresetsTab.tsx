@@ -5,6 +5,7 @@ import {
   useDeletePreset,
   useUpdatePreset,
 } from '../../hooks/useSettings'
+import { useToast } from '../../context/ToastContext'
 import { PricingPreset } from '../../lib/supabase'
 
 export function PresetsTab() {
@@ -85,12 +86,14 @@ export function PresetsTab() {
 
 function DeletePresetButton({ id, name }: { id: string; name: string }) {
   const del = useDeletePreset()
+  const { showToast } = useToast()
   const handleClick = async () => {
     if (!confirm(`Delete preset "${name}"? Brands already using it keep their prices.`)) return
     try {
       await del.mutateAsync(id)
+      showToast('Preset deleted')
     } catch (err) {
-      alert('Delete failed: ' + (err instanceof Error ? err.message : String(err)))
+      showToast('Delete failed: ' + (err instanceof Error ? err.message : String(err)), 'error')
     }
   }
   return (
@@ -117,6 +120,7 @@ function PresetFormModal({
   const [error, setError] = useState<string | null>(null)
   const create = useCreatePreset()
   const update = useUpdatePreset()
+  const { showToast } = useToast()
   const isEditing = preset !== null
   const isPending = create.isPending || update.isPending
 
@@ -132,8 +136,10 @@ function PresetFormModal({
     try {
       if (isEditing) {
         await update.mutateAsync({ id: preset!.id, name: name.trim(), min_price: min, max_price: max })
+        showToast('Preset updated')
       } else {
         await create.mutateAsync({ name: name.trim(), min_price: min, max_price: max })
+        showToast('Preset created')
       }
       onClose()
     } catch (err) {

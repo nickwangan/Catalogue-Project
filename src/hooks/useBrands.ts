@@ -6,13 +6,14 @@ import {
   BrandLogo,
   BrandWithDetails,
   Gender,
+  PriceContext,
   slugify,
 } from '../lib/supabase'
 
 // ============================================================
 // Hook: useBrands
-// Returns all brands joined with their categories + first logo,
-// for the main brands table.
+// Returns all brands joined with categories, logos, and assigned
+// price contexts, for the main brands table.
 // ============================================================
 export function useBrands() {
   return useQuery({
@@ -28,13 +29,25 @@ export function useBrands() {
 
       const brandIds = brands.map(b => b.id)
 
-      const [categoriesRes, logosRes] = await Promise.all([
+      const [categoriesRes, logosRes, contextsRes] = await Promise.all([
         supabase.from('brand_categories').select('*').in('brand_id', brandIds),
         supabase.from('brand_logos').select('*').in('brand_id', brandIds).order('display_order'),
+        supabase
+          .from('brand_price_contexts')
+          .select('brand_id, price_contexts(*)')
+          .in('brand_id', brandIds),
       ])
 
       if (categoriesRes.error) throw categoriesRes.error
       if (logosRes.error) throw logosRes.error
+      if (contextsRes.error) throw contextsRes.error
+
+      const contextsByBrand: Record<string, PriceContext[]> = {}
+      for (const row of (contextsRes.data ?? []) as any[]) {
+        if (!row.price_contexts) continue
+        if (!contextsByBrand[row.brand_id]) contextsByBrand[row.brand_id] = []
+        contextsByBrand[row.brand_id].push(row.price_contexts)
+      }
 
       return brands.map((brand: Brand) => ({
         ...brand,
@@ -44,6 +57,7 @@ export function useBrands() {
         logos: (logosRes.data ?? []).filter(
           (l: BrandLogo) => l.brand_id === brand.id,
         ),
+        price_contexts: contextsByBrand[brand.id] ?? [],
       }))
     },
   })
@@ -79,6 +93,7 @@ export type CreateBrandInput = {
     max_price: number
     preset_used: string | null
   }>
+  price_context_ids: string[]
   username: string // for change history
 }
 
@@ -121,6 +136,18 @@ export function useCreateBrand() {
         if (catError) throw catError
       }
 
+      if (input.price_context_ids.length > 0) {
+        const { error: ctxError } = await supabase
+          .from('brand_price_contexts')
+          .insert(
+            input.price_context_ids.map(price_context_id => ({
+              brand_id: brand.id,
+              price_context_id,
+            })),
+          )
+        if (ctxError) throw ctxError
+      }
+
       // log change history
       await supabase.from('brand_change_history').insert({
         brand_id: brand.id,
@@ -153,6 +180,7 @@ export type UpdateBrandInput = {
     max_price: number
     preset_used: string | null
   }>
+  price_context_ids: string[]
   username: string
 }
 
@@ -197,6 +225,25 @@ export function useUpdateBrand() {
             })),
           )
         if (catError) throw catError
+      }
+
+      // Replace price contexts
+      const { error: ctxDelError } = await supabase
+        .from('brand_price_contexts')
+        .delete()
+        .eq('brand_id', input.brandId)
+      if (ctxDelError) throw ctxDelError
+
+      if (input.price_context_ids.length > 0) {
+        const { error: ctxError } = await supabase
+          .from('brand_price_contexts')
+          .insert(
+            input.price_context_ids.map(price_context_id => ({
+              brand_id: input.brandId,
+              price_context_id,
+            })),
+          )
+        if (ctxError) throw ctxError
       }
 
       await supabase.from('brand_change_history').insert({

@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { supabase, Category, PricingPreset } from '../lib/supabase'
+import { supabase, Category, PricingPreset, PriceContext } from '../lib/supabase'
 
 // ============================================================
 // Hook: useCategories
@@ -29,6 +29,24 @@ export function usePricingPresets() {
     queryFn: async (): Promise<PricingPreset[]> => {
       const { data, error } = await supabase
         .from('pricing_presets')
+        .select('*')
+        .order('name', { ascending: true })
+      if (error) throw error
+      return data ?? []
+    },
+  })
+}
+
+// ============================================================
+// Hook: usePriceContexts
+// All available price modifiers (additive, e.g., "Linen +$10")
+// ============================================================
+export function usePriceContexts() {
+  return useQuery({
+    queryKey: ['price_contexts'],
+    queryFn: async (): Promise<PriceContext[]> => {
+      const { data, error } = await supabase
+        .from('price_contexts')
         .select('*')
         .order('name', { ascending: true })
       if (error) throw error

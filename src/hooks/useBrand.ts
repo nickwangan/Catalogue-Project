@@ -1,15 +1,24 @@
 import { useQuery } from '@tanstack/react-query'
-import { supabase, Brand, BrandLogo, BrandCategory, ChangeHistoryEntry } from '../lib/supabase'
+import {
+  supabase,
+  Brand,
+  BrandLogo,
+  BrandCategory,
+  ChangeHistoryEntry,
+  PriceContext,
+} from '../lib/supabase'
 
 export type BrandDetail = Brand & {
   logos: BrandLogo[]
   categories: BrandCategory[]
   history: ChangeHistoryEntry[]
+  price_contexts: PriceContext[]
 }
 
 // ============================================================
 // Hook: useBrand
-// Fetches a single brand by slug, with logos, categories, and history
+// Fetches a single brand by slug, with logos, categories,
+// change history, and assigned price contexts.
 // ============================================================
 export function useBrand(slug: string | undefined) {
   return useQuery({
@@ -27,7 +36,7 @@ export function useBrand(slug: string | undefined) {
       if (brandError) throw brandError
       if (!brand) return null
 
-      const [logosRes, categoriesRes, historyRes] = await Promise.all([
+      const [logosRes, categoriesRes, historyRes, contextsRes] = await Promise.all([
         supabase
           .from('brand_logos')
           .select('*')
@@ -43,17 +52,27 @@ export function useBrand(slug: string | undefined) {
           .select('*')
           .eq('brand_id', brand.id)
           .order('changed_at', { ascending: false }),
+        supabase
+          .from('brand_price_contexts')
+          .select('price_context_id, price_contexts(*)')
+          .eq('brand_id', brand.id),
       ])
 
       if (logosRes.error) throw logosRes.error
       if (categoriesRes.error) throw categoriesRes.error
       if (historyRes.error) throw historyRes.error
+      if (contextsRes.error) throw contextsRes.error
+
+      const price_contexts: PriceContext[] = (contextsRes.data ?? [])
+        .map((row: any) => row.price_contexts)
+        .filter(Boolean)
 
       return {
         ...brand,
         logos: logosRes.data ?? [],
         categories: categoriesRes.data ?? [],
         history: historyRes.data ?? [],
+        price_contexts,
       }
     },
   })

@@ -19,30 +19,15 @@ export function useAllUsers() {
   })
 }
 
+// Uses SECURITY DEFINER RPC to avoid RLS edge cases.
 export function useUpdateUserRole() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async ({ userId, role }: { userId: string; role: UserRole }) => {
-      const { error } = await supabase
-        .from('user_profiles')
-        .update({ role })
-        .eq('user_id', userId)
-      if (error) throw error
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['user_profiles'] })
-    },
-  })
-}
-
-export function useDeleteUserProfile() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (userId: string) => {
-      const { error } = await supabase
-        .from('user_profiles')
-        .delete()
-        .eq('user_id', userId)
+      const { error } = await supabase.rpc('update_user_role', {
+        p_user_id: userId,
+        p_role: role,
+      })
       if (error) throw error
     },
     onSuccess: () => {
@@ -132,3 +117,59 @@ export function useDeleteCategory() {
     },
   })
 }
+
+// ============================================================
+// PRICE CONTEXTS (modifiers)
+// ============================================================
+
+type PriceContextInput = { name: string; modifier_amount: number }
+
+export function useCreatePriceContext() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: PriceContextInput) => {
+      const { error } = await supabase.from('price_contexts').insert([input])
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['price_contexts'] })
+    },
+  })
+}
+
+export function useUpdatePriceContext() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, ...input }: PriceContextInput & { id: string }) => {
+      const { error } = await supabase
+        .from('price_contexts')
+        .update(input)
+        .eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['price_contexts'] })
+      qc.invalidateQueries({ queryKey: ['brand'] })
+      qc.invalidateQueries({ queryKey: ['brands'] })
+    },
+  })
+}
+
+export function useDeletePriceContext() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('price_contexts').delete().eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['price_contexts'] })
+      qc.invalidateQueries({ queryKey: ['brand'] })
+      qc.invalidateQueries({ queryKey: ['brands'] })
+    },
+  })
+}
+
+// Re-export for use in UsersTab — only kept so older imports don't break.
+// (Delete-user feature is intentionally removed from the UI; manage via Supabase dashboard.)
+export type { UserProfile, UserRole }

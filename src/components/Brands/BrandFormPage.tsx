@@ -4,7 +4,12 @@ import { useAuth } from '../../hooks/useAuth'
 import { useBrand } from '../../hooks/useBrand'
 import { useCreateBrand, useUpdateBrand } from '../../hooks/useBrands'
 import { useUploadLogos } from '../../hooks/useLogos'
-import { useCategories, usePricingPresets } from '../../hooks/useReference'
+import {
+  useCategories,
+  usePricingPresets,
+  usePriceContexts,
+} from '../../hooks/useReference'
+import { useToast } from '../../context/ToastContext'
 import { Gender } from '../../lib/supabase'
 
 type CategoryRow = {
@@ -25,15 +30,18 @@ export function BrandFormPage({ mode }: { mode: Mode }) {
   const { data: brand, isLoading: brandLoading } = useBrand(isEdit ? slug : undefined)
   const { data: categories } = useCategories()
   const { data: presets } = usePricingPresets()
+  const { data: priceContexts } = usePriceContexts()
   const createBrand = useCreateBrand()
   const updateBrand = useUpdateBrand()
   const uploadLogos = useUploadLogos()
+  const { showToast } = useToast()
 
   const [name, setName] = useState('')
   const [context, setContext] = useState('')
   const [notes, setNotes] = useState('')
   const [genders, setGenders] = useState<Gender[]>([])
   const [rows, setRows] = useState<CategoryRow[]>([])
+  const [selectedContextIds, setSelectedContextIds] = useState<string[]>([])
   const [files, setFiles] = useState<File[]>([])
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -53,6 +61,7 @@ export function BrandFormPage({ mode }: { mode: Mode }) {
           preset_used: c.preset_used,
         })),
       )
+      setSelectedContextIds(brand.price_contexts.map(c => c.id))
     }
   }, [isEdit, brand])
 
@@ -194,6 +203,7 @@ export function BrandFormPage({ mode }: { mode: Mode }) {
           notes: notes.trim() || null,
           genders,
           categories: cleanedRows,
+          price_context_ids: selectedContextIds,
           username: username ?? '',
         })
         resultBrandId = res.brandId
@@ -205,6 +215,7 @@ export function BrandFormPage({ mode }: { mode: Mode }) {
           notes: notes.trim() || null,
           genders,
           categories: cleanedRows,
+          price_context_ids: selectedContextIds,
           username: username ?? '',
         })
         resultBrandId = created.id
@@ -220,6 +231,7 @@ export function BrandFormPage({ mode }: { mode: Mode }) {
         })
       }
 
+      showToast(isEdit ? 'Brand updated' : 'Brand created')
       navigate(`/brand/${resultSlug}`)
     } catch (err: any) {
       setError(
@@ -437,6 +449,56 @@ export function BrandFormPage({ mode }: { mode: Mode }) {
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+          </section>
+
+          {/* 5. Price Contexts (optional) */}
+          <section className="bg-white rounded-lg shadow-md p-6">
+            <h2 className="text-lg font-semibold text-gray-800 mb-2">
+              5. Price Contexts (Optional)
+            </h2>
+            <p className="text-sm text-gray-600 mb-3">
+              Pick any modifiers that should be available on this brand's page.
+              They appear as tickboxes next to the pricing table and add their
+              amount to every price when toggled on.
+            </p>
+            {(priceContexts ?? []).length === 0 ? (
+              <p className="text-sm text-gray-500 italic">
+                No price contexts defined yet. Add them in Settings → Price Contexts.
+              </p>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {priceContexts!.map(ctx => {
+                  const checked = selectedContextIds.includes(ctx.id)
+                  return (
+                    <label
+                      key={ctx.id}
+                      className={`flex items-center gap-2 px-3 py-2 border rounded-lg cursor-pointer ${
+                        checked ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() =>
+                          setSelectedContextIds(prev =>
+                            prev.includes(ctx.id)
+                              ? prev.filter(id => id !== ctx.id)
+                              : [...prev, ctx.id],
+                          )
+                        }
+                      />
+                      <span className="text-sm text-gray-800">
+                        {ctx.name}{' '}
+                        <span className="text-gray-500">
+                          ({Number(ctx.modifier_amount) >= 0 ? '+' : ''}
+                          ${Number(ctx.modifier_amount).toFixed(2)})
+                        </span>
+                      </span>
+                    </label>
+                  )
+                })}
               </div>
             )}
           </section>
