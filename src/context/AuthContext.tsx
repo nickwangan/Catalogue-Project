@@ -4,9 +4,13 @@ import { supabase, UserRole } from '../lib/supabase'
 
 type AuthContextType = {
   user: User | null
+  username: string | null
   role: UserRole | null
   loading: boolean
+  isAdmin: boolean
   isManager: boolean
+  isEmployee: boolean
+  canEditBrands: boolean
   logout: () => Promise<void>
   refreshSession: () => Promise<void>
 }
@@ -15,9 +19,9 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
+  const [username, setUsername] = useState<string | null>(null)
   const [role, setRole] = useState<UserRole | null>(null)
   const [loading, setLoading] = useState(true)
-  const [refreshTrigger, setRefreshTrigger] = useState(0)
 
   const refreshSession = async () => {
     setLoading(true)
@@ -25,8 +29,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { data: { session } } = await supabase.auth.getSession()
       setUser(session?.user ?? null)
       if (session?.user) {
-        await fetchUserRole(session.user.id)
+        await fetchUserProfile(session.user.id)
       } else {
+        setUsername(null)
         setRole(null)
         setLoading(false)
       }
@@ -38,24 +43,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     refreshSession()
-  }, [refreshTrigger])
+  }, [])
 
-  const fetchUserRole = async (userId: string) => {
+  const fetchUserProfile = async (userId: string) => {
     try {
       const { data, error } = await supabase
-        .from('user_roles')
-        .select('role')
+        .from('user_profiles')
+        .select('username, role')
         .eq('user_id', userId)
         .single()
 
       if (error) {
-        console.error('Error fetching user role:', error)
+        console.error('Error fetching user profile:', error)
+        setUsername(null)
         setRole(null)
       } else {
-        setRole(data?.role as UserRole)
+        setUsername(data?.username ?? null)
+        setRole((data?.role as UserRole) ?? null)
       }
     } catch (err) {
       console.error('Unexpected error:', err)
+      setUsername(null)
       setRole(null)
     } finally {
       setLoading(false)
@@ -69,12 +77,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error('Logout error:', err)
     }
     setUser(null)
+    setUsername(null)
     setRole(null)
     setLoading(false)
   }
 
+  const isAdmin = role === 'admin'
+  const isManager = role === 'manager'
+  const isEmployee = role === 'employee'
+  const canEditBrands = isAdmin || isManager
+
   return (
-    <AuthContext.Provider value={{ user, role, loading, isManager: role === 'manager', logout, refreshSession }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        username,
+        role,
+        loading,
+        isAdmin,
+        isManager,
+        isEmployee,
+        canEditBrands,
+        logout,
+        refreshSession,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   )

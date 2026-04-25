@@ -1,11 +1,21 @@
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { LoginPage } from './components/Auth/LoginPage'
-import { Dashboard } from './components/Dashboard/Dashboard'
+import { BrandsPage } from './components/Brands/BrandsPage'
+import { BrandPage } from './components/Brands/BrandPage'
+import { BrandFormPage } from './components/Brands/BrandFormPage'
 
-const queryClient = new QueryClient()
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+})
 
-function AppContent() {
+function ProtectedRoutes() {
   const { user, loading } = useAuth()
 
   if (loading) {
@@ -19,15 +29,29 @@ function AppContent() {
     )
   }
 
-  return user ? <Dashboard /> : <LoginPage />
+  if (!user) {
+    return <LoginPage />
+  }
+
+  return (
+    <Routes>
+      <Route path="/" element={<BrandsPage />} />
+      <Route path="/brand/new" element={<BrandFormPage mode="create" />} />
+      <Route path="/brand/:slug" element={<BrandPage />} />
+      <Route path="/brand/:slug/edit" element={<BrandFormPage mode="edit" />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  )
 }
 
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <AppContent />
-      </AuthProvider>
+      <BrowserRouter>
+        <AuthProvider>
+          <ProtectedRoutes />
+        </AuthProvider>
+      </BrowserRouter>
     </QueryClientProvider>
   )
 }
