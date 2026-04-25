@@ -18,7 +18,8 @@ export function BrandPage() {
 
   const [categoryFilter, setCategoryFilter] = useState<string[]>([])
   const [filterOpen, setFilterOpen] = useState(false)
-  const [activeContextIds, setActiveContextIds] = useState<string[]>([])
+  // Map of category-row id -> active price-context ids (per-row modifiers)
+  const [activeByRow, setActiveByRow] = useState<Record<string, string[]>>({})
 
   const allCategories = useMemo(
     () => brand?.categories.map(c => c.category) ?? [],
@@ -31,15 +32,15 @@ export function BrandPage() {
     return brand.categories.filter(c => categoryFilter.includes(c.category))
   }, [brand, categoryFilter])
 
-  const activeContexts: PriceContext[] = useMemo(() => {
-    if (!brand) return []
-    return brand.price_contexts.filter(c => activeContextIds.includes(c.id))
-  }, [brand, activeContextIds])
-
-  const totalModifier = useMemo(
-    () => activeContexts.reduce((sum, c) => sum + Number(c.modifier_amount), 0),
-    [activeContexts],
-  )
+  const toggleRowContext = (rowId: string, contextId: string) => {
+    setActiveByRow(prev => {
+      const cur = prev[rowId] ?? []
+      const next = cur.includes(contextId)
+        ? cur.filter(id => id !== contextId)
+        : [...cur, contextId]
+      return { ...prev, [rowId]: next }
+    })
+  }
 
   const handleDelete = async () => {
     if (!brand) return
@@ -72,8 +73,6 @@ export function BrandPage() {
       </div>
     )
   }
-
-  const hasActive = activeContexts.length > 0
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -137,44 +136,7 @@ export function BrandPage() {
         {/* Pricing Table */}
         <div className="bg-white rounded-lg shadow-md p-6">
           <div className="flex flex-wrap justify-between items-start gap-4 mb-4">
-            <div className="flex flex-wrap items-center gap-3">
-              <h2 className="text-2xl font-bold text-gray-900">Pricing by Category</h2>
-              {brand.price_contexts.length > 0 && (
-                <div className="flex flex-wrap items-center gap-2 ml-2">
-                  {brand.price_contexts.map(ctx => {
-                    const checked = activeContextIds.includes(ctx.id)
-                    return (
-                      <label
-                        key={ctx.id}
-                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-sm cursor-pointer transition-colors ${
-                          checked
-                            ? 'border-amber-400 bg-amber-50 text-amber-900'
-                            : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() =>
-                            setActiveContextIds(prev =>
-                              prev.includes(ctx.id)
-                                ? prev.filter(id => id !== ctx.id)
-                                : [...prev, ctx.id],
-                            )
-                          }
-                          className="accent-amber-500"
-                        />
-                        <span className="font-medium">{ctx.name}</span>
-                        <span className="text-xs text-gray-500">
-                          ({Number(ctx.modifier_amount) >= 0 ? '+' : ''}
-                          ${Number(ctx.modifier_amount).toFixed(2)})
-                        </span>
-                      </label>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
+            <h2 className="text-2xl font-bold text-gray-900">Pricing by Category</h2>
             {allCategories.length > 0 && (
               <div className="relative">
                 <button
@@ -232,26 +194,66 @@ export function BrandPage() {
                   {filteredCategories.map((c, idx) => {
                     const baseMin = Number(c.min_price)
                     const baseMax = Number(c.max_price)
-                    const totalMin = baseMin + totalModifier
-                    const totalMax = baseMax + totalModifier
+                    const rowActiveIds = activeByRow[c.id] ?? []
+                    const rowActiveContexts = brand.price_contexts.filter(ctx =>
+                      rowActiveIds.includes(ctx.id),
+                    )
+                    const rowModifier = rowActiveContexts.reduce(
+                      (sum, ctx) => sum + Number(ctx.modifier_amount),
+                      0,
+                    )
+                    const totalMin = baseMin + rowModifier
+                    const totalMax = baseMax + rowModifier
+                    const hasActive = rowActiveContexts.length > 0
                     const rowBorder =
                       idx !== filteredCategories.length - 1 ? 'border-b-2 border-gray-300' : ''
                     return (
                       <tr key={c.id} className={rowBorder}>
-                        <td className="px-6 py-4 font-medium text-gray-800">{c.category}</td>
-                        <td className="px-6 py-4 text-right text-gray-700">
+                        <td className="px-6 py-4 align-top">
+                          <div className="font-medium text-gray-800 mb-2">{c.category}</div>
+                          {brand.price_contexts.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5">
+                              {brand.price_contexts.map(ctx => {
+                                const checked = rowActiveIds.includes(ctx.id)
+                                return (
+                                  <label
+                                    key={ctx.id}
+                                    className={`flex items-center gap-1 px-2 py-0.5 rounded-md border text-xs cursor-pointer transition-colors ${
+                                      checked
+                                        ? 'border-amber-400 bg-amber-50 text-amber-900'
+                                        : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+                                    }`}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={checked}
+                                      onChange={() => toggleRowContext(c.id, ctx.id)}
+                                      className="accent-amber-500"
+                                    />
+                                    <span className="font-medium">{ctx.name}</span>
+                                    <span className="text-gray-500">
+                                      ({Number(ctx.modifier_amount) >= 0 ? '+' : ''}
+                                      ${Number(ctx.modifier_amount).toFixed(2)})
+                                    </span>
+                                  </label>
+                                )
+                              })}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-right text-gray-700 align-top">
                           <PriceCell
                             base={baseMin}
                             total={totalMin}
-                            activeContexts={activeContexts}
+                            activeContexts={rowActiveContexts}
                             showBreakdown={hasActive}
                           />
                         </td>
-                        <td className="px-6 py-4 text-right text-gray-700">
+                        <td className="px-6 py-4 text-right text-gray-700 align-top">
                           <PriceCell
                             base={baseMax}
                             total={totalMax}
-                            activeContexts={activeContexts}
+                            activeContexts={rowActiveContexts}
                             showBreakdown={hasActive}
                           />
                         </td>
